@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>گرافیک خطی سیر راهبران - نسخه 1.17</title>
+    <title>گرافیک خطی سیر راهبران - نسخه 1.18</title>
     <style>
         :root {
             --bg: #0c0d14;
@@ -154,9 +154,8 @@
 <body>
 
     <div id="homePage" class="page active">
-        <h2>📋 سیستم تنظیم هوشمند شیفت راهبران - نسخه 1.17</h2>
+        <h2>📋 سیستم تنظیم هوشمند شیفت راهبران - نسخه 1.18</h2>
         
-        <!-- ورود دستی -->
         <div class="section-box">
             <h3>⚠️ ورود دستی برنامه (مواقع اضطراری)</h3>
             <div class="manual-row">
@@ -180,7 +179,6 @@
             <button class="btn-blue" onclick="addManualTrip()">➕ ثبت و پردازش دستی قطار</button>
         </div>
 
-        <!-- ورودی‌های پیامک -->
         <div class="section-box">
             <h3>📥 استخراج از روی متن پیامک‌ها</h3>
             <label style="font-size: 11px; color: #8f92a1; display:block; margin-bottom:4px;">۱. متن پیامک خط اصلی (وکیل‌آباد/غدیر)</label>
@@ -197,7 +195,6 @@
         <div id="tripsList" style="margin-top: 5px;"></div>
     </div>
 
-    <!-- صفحه گراف ریلی -->
     <div id="graphPage" class="page" style="max-width: 100%;">
         <button onclick="showHome()" style="background: #262837; color: white; width: auto; padding: 10px 20px; margin-bottom: 15px;">🔙 بازگشت به لیست</button>
         <div id="routeHeader" class="route-info"></div>
@@ -279,7 +276,9 @@
 
             let platformSec = getSecondsOfDay(platformTime);
             let dispatchSec = getSecondsOfDay(dispatchTime);
-            let workSec = (type === "E") ? (dispatchSec - (20 * 60)) : (platformSec - (30 * 60));
+            
+            // پیش‌فرض رینگ برای محاسبه حضور دستی بر اساس ساعت اعزام
+            let workSec = (type === "E") ? (dispatchSec - (20 * 60)) : (dispatchSec - (30 * 60));
 
             let label = type === "S" ? "غدیر" : (type === "E" ? "وکیل‌آباد" : "لوپ کامل فرودگاه");
             let raw = `اعزام دستی قطار | مبدأ: ${label} | سکو ${platformTime} | اعزام ${dispatchTime} R-R`;
@@ -336,14 +335,14 @@
                         let isTerminalEntry = /P-/i.test(statusPart); 
                         let isToParking = /-P/i.test(statusPart);     
 
+                        // ⚡ اصلاح مهندسی معکوس نسخه 1.18: زمان حضور تماماً از ساعت اعزام (dS) کسر می‌شود
                         let baseMinutes = 0;
                         if (type === "E") {
                             baseMinutes = isTerminalEntry ? 30 : 20; 
-                            wS = dS - (baseMinutes * 60);
                         } else {
                             baseMinutes = isTerminalEntry ? 40 : 30; 
-                            wS = pS - (baseMinutes * 60);
                         }
+                        let wS = dS - (baseMinutes * 60);
                         
                         tempTrips.push({ 
                             type: type, platformTime: pT, dispatchTime: dT, 
@@ -373,10 +372,10 @@
                         matchTrip.airportBackPlatformStr = backPlatformStr;
                         matchTrip.airportBackDispatchStr = backDispatchStr;
                         
+                        // ⚡ در فرودگاهی هم ملاک کسر دقیقه، ساعت اعزام رفت فرودگاه (goDispatchStr) قرار گرفت
                         let baseMinutes = matchTrip.isTerminalEntry ? 40 : 30;
-                        matchTrip.workSec = getSecondsOfDay(goPlatformStr) - (baseMinutes * 60);
+                        matchTrip.workSec = getSecondsOfDay(goDispatchStr) - (baseMinutes * 60);
                         
-                        // ⚡ اصلاح متنی لیبل فرودگاهی مطابق درخواست شما نسخه 1.17
                         matchTrip.raw = `✈️ لوپ زنجیره‌ای فرودگاه | غدیر به فرودگاه : ${goDispatchStr} | فرودگاه به غدیر : ${backDispatchStr} | اعزام به خط اصلی از غدیر: ${matchTrip.dispatchTime}`;
                     }
                 }
@@ -385,6 +384,7 @@
             if (tempTrips.length === 0) return;
             tempTrips.sort((a, b) => a.dispatchSec - b.dispatchSec);
 
+            // محاسبه مجدد و قطعی برای قطار اول کل روز بر اساس اعزام
             let firstTrip = tempTrips[0];
             let baseMinutes = 0;
             if (firstTrip.type === "E") {
@@ -392,10 +392,10 @@
                 firstTrip.workSec = firstTrip.dispatchSec - (baseMinutes * 60);
             } else if (firstTrip.type === "F") {
                 baseMinutes = firstTrip.isTerminalEntry ? 40 : 30;
-                firstTrip.workSec = getSecondsOfDay(firstTrip.airportGoPlatformStr) - (baseMinutes * 60);
+                firstTrip.workSec = getSecondsOfDay(firstTrip.airportGoDispatchStr) - (baseMinutes * 60);
             } else {
                 baseMinutes = firstTrip.isTerminalEntry ? 40 : 30;
-                firstTrip.workSec = firstTrip.platformSec - (baseMinutes * 60);
+                firstTrip.workSec = firstTrip.dispatchSec - (baseMinutes * 60);
             }
 
             let now = new Date();
@@ -437,6 +437,7 @@
                 }
             }
 
+            // فیکس رندر زنده نسخه 1.18 از روی اعزام قطار اول
             let firstTrip = parsedTrips[0];
             let baseMin = 0;
             if (firstTrip.type === "E") { 
@@ -444,10 +445,10 @@
                 firstTrip.workSec = firstTrip.dispatchSec - (baseMin * 60); 
             } else if (firstTrip.type === "F") { 
                 baseMin = firstTrip.isTerminalEntry ? 40 : 30;
-                firstTrip.workSec = getSecondsOfDay(firstTrip.airportGoPlatformStr) - (baseMin * 60); 
+                firstTrip.workSec = getSecondsOfDay(firstTrip.airportGoDispatchStr) - (baseMin * 60); 
             } else { 
                 baseMin = firstTrip.isTerminalEntry ? 40 : 30;
-                firstTrip.workSec = firstTrip.platformSec - (baseMin * 60); 
+                firstTrip.workSec = firstTrip.dispatchSec - (baseMin * 60); 
             }
 
             let listHtml = "";
