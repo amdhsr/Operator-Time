@@ -69,6 +69,7 @@
         }
         .btn-blue { background: linear-gradient(135deg, #0288d1, #29b6f6); color: white; }
         .btn-red { background: linear-gradient(135deg, #d32f2f, #ff5252); color: white; margin-top: 10px; }
+        .btn-purple { background: linear-gradient(135deg, #6a1b9a, #b388ff); color: white; margin-top: 8px; display: none; }
         
         .trip-card {
             background-color: var(--card); border-right: 5px solid #333;
@@ -186,7 +187,10 @@
             <label style="font-size: 11px; color: #8f92a1; display:block; margin-bottom:4px; margin-top:6px;">۲. متن پیامک انشعاب فرودگاه (در صورت وجود)</label>
             <textarea id="airportSmsInput" placeholder="اگر پیامک انشعاب فرودگاه دارید، اینجا پیست کنید (اختیاری)..."></textarea>
             
-            <button class="btn-blue" onclick="parseSms()">📊 استخراج گراف ریلی یکپارچه</button>
+            <button class="btn-blue" onclick="parseSms(false)">📊 استخراج گراف ریلی یکپارچه</button>
+            
+            <button id="tomorrowBtn" class="btn-purple" onclick="parseSms(true)">🗓️ بله، این برنامه فرداست (محاسبه با زمان فردا)</button>
+            
             <button class="btn-red" onclick="clearAllData()">🗑️ حذف و پاکسازی کل اطلاعات</button>
         </div>
 
@@ -232,17 +236,22 @@
         let currentActiveInterval = null;
         let homePageInterval = null; 
         let lastInteractionTime = 0; 
+        let isTomorrowShift = false; // فلگ هوشمند تشخیص شیفت فردا
 
         function logUserInteraction() { lastInteractionTime = Date.now(); }
 
         function getSecondsOfDay(timeStr, offsetSeconds = 0) {
             let parts = timeStr.split(':');
-            return (parseInt(parts[0]) * 3600) + (parseInt(parts[1]) * 60) + offsetSeconds;
+            let baseSec = (parseInt(parts[0]) * 3600) + (parseInt(parts[1]) * 60) + offsetSeconds;
+            // ⚡ اگر تایید شده بود که شیفت فرداست، ۸۶۴۰۰ ثانیه (یک شبانه‌روز) به زمان قطارها اضافه می‌شود
+            if (isTomorrowShift) baseSec += 86400; 
+            return baseSec;
         }
 
         function formatSecondsToTime(totalSeconds) {
-            let h = Math.floor(totalSeconds / 3600) % 24;
-            let m = Math.floor((totalSeconds % 3600) / 60);
+            let actualSec = totalSeconds % 86400; // کسر ۲۴ ساعت اضافی برای نمایش درست ساعت
+            let h = Math.floor(actualSec / 3600) % 24;
+            let m = Math.floor((actualSec % 3600) / 60);
             return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
         }
 
@@ -250,7 +259,9 @@
             if (confirm("آیا از حذف کل لیست اعزام‌ها و خالی کردن کادرهای پیامک اطمینان دارید؟")) {
                 document.getElementById('mainSmsInput').value = "";
                 document.getElementById('airportSmsInput').value = "";
+                document.getElementById('tomorrowBtn').style.display = "none";
                 parsedTrips = [];
+                isTomorrowShift = false;
                 if(homePageInterval) clearInterval(homePageInterval);
                 document.getElementById('tripsList').innerHTML = "";
             }
@@ -291,7 +302,10 @@
             showHome();
         }
 
-        function parseSms() {
+        function parseSms(forceTomorrow = false) {
+            isTomorrowShift = forceTomorrow; // ست کردن وضعیت بر اساس کلیک کاربر
+            document.getElementById('tomorrowBtn').style.display = "none";
+
             let mainText = document.getElementById('mainSmsInput').value;
             let airportText = document.getElementById('airportSmsInput').value;
 
@@ -301,7 +315,6 @@
             let filteredAirportLines = [];
             airportLines.forEach(l => {
                 let clean = l.trim();
-                // ⚡ حذف علامت ^ برای برداشتن حساسیت شروع خط
                 if (/[SE]\)/i.test(clean)) filteredAirportLines.push(clean);
             });
 
@@ -310,7 +323,6 @@
             mainLines.forEach((line) => {
                 let clean = line.trim();
                 let type = "";
-                // ⚡ اصلاح رگولار اکسپرسیون برای پیدا کردن علامت مبدا در هر کجای خط
                 if (/S\)/i.test(clean)) type = "S";
                 else if (/E\)/i.test(clean)) type = "E";
                 
@@ -355,8 +367,23 @@
                 }
             }
 
+            if (tempTrips.length === 0) return;
+
+            tempTrips.sort((a, b) => a.dispatchSec - b.dispatchSec);
+
+            // ⚡ چت‌باکس هوشمند تشخیص انقضای زمان کل لیست
+            let now = new Date();
+            let currentSeconds = (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
+            
+            let lastTrip = tempTrips[tempTrips.length - 1];
+            let totalMainLineSec = (lastTrip.type === "E") ? 2392 : 2535;
+            
+            // اگر بدون تایید فردا، ساعت فعلی از پایان آخرین قطار رد شده بود: دکمه فردا را نشان بده
+            if (!isTomorrowShift && currentSeconds > (lastTrip.dispatchSec + totalMainLineSec)) {
+                document.getElementById('tomorrowBtn').style.display = "block";
+            }
+
             parsedTrips = tempTrips;
-            parsedTrips.sort((a, b) => a.dispatchSec - b.dispatchSec);
             showHome();
         }
 
@@ -372,6 +399,9 @@
             if (parsedTrips.length === 0) { document.getElementById('tripsList').innerHTML = ""; return; }
             let now = new Date();
             let currentSeconds = (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
+            
+            // اگر سیستم روی مود فرودگاهی فردا فیکس شده بود، زمان گوشی را با اضافه کردن یک روز با سرور هماهنگ کن
+            let checkTime = isTomorrowShift ? currentSeconds : currentSeconds;
 
             let bestIndex = -1;
             for(let i = 0; i < parsedTrips.length; i++) {
@@ -379,7 +409,7 @@
                 let totalMainLineSec = (trip.type === "E") ? 2392 : 2535;
                 let tripEndSec = trip.dispatchSec + totalMainLineSec;
                 
-                if (currentSeconds <= tripEndSec) {
+                if (checkTime <= tripEndSec) {
                     bestIndex = i;
                     break;
                 }
@@ -401,23 +431,25 @@
                 let workTimeStr = formatSecondsToTime(trip.workSec);
 
                 let totalMainLineSec = (trip.type === "E") ? 2392 : 2535;
-                let isThisTripFinished = (currentSeconds > trip.dispatchSec + totalMainLineSec);
+                let isThisTripFinished = (checkTime > trip.dispatchSec + totalMainLineSec);
 
                 if (isCurrent && !isThisTripFinished) {
                     let targetPlatformSec = trip.isAirportChain ? getSecondsOfDay(trip.airportGoPlatformStr) : trip.platformSec;
                     let targetDispatchSec = trip.isAirportChain ? getSecondsOfDay(trip.airportGoDispatchStr) : trip.dispatchSec;
 
-                    if (isFirstTripOfAll && currentSeconds < trip.workSec) {
-                        let remSeconds = trip.workSec - currentSeconds;
+                    if (isFirstTripOfAll && checkTime < trip.workSec) {
+                        let remSeconds = trip.workSec - checkTime;
                         let remMin = Math.ceil(remSeconds / 60);
-                        liveTagHtml = `<span class="live-tag work">⏱️ ساعت حضور در ${placeName}: ${workTimeStr} (${remMin} دقیقه مانده تا حضور)</span>`;
+                        // کلمه فردا در صورت لزوم اضافه می‌شود
+                        let tomorrowLabel = isTomorrowShift ? "فردا " : "";
+                        liveTagHtml = `<span class="live-tag work">⏱️ ساعت حضور در ${placeName}: ${tomorrowLabel}${workTimeStr} (${remMin} دقیقه مانده)</span>`;
                     } 
-                    else if (currentSeconds >= (isFirstTripOfAll ? trip.workSec : 0) && currentSeconds < targetPlatformSec) {
-                        let remMin = Math.ceil((targetPlatformSec - currentSeconds) / 60);
+                    else if (checkTime >= (isFirstTripOfAll ? trip.workSec : 0) && checkTime < targetPlatformSec) {
+                        let remMin = Math.ceil((targetPlatformSec - checkTime) / 60);
                         liveTagHtml = `<span class="live-tag countdown-p">⏳ ${remMin} دقیقه مانده تا اولین سکو</span>`;
                     } 
-                    else if (currentSeconds >= targetPlatformSec && currentSeconds < targetDispatchSec) {
-                        let remMin = Math.ceil((targetDispatchSec - currentSeconds) / 60);
+                    else if (checkTime >= targetPlatformSec && checkTime < targetDispatchSec) {
+                        let remMin = Math.ceil((targetDispatchSec - checkTime) / 60);
                         liveTagHtml = `<span class="live-tag countdown-d">🚨 ${remMin} دقیقه مانده تا اعزام</span>`;
                     } 
                     else if (trip.isAirportChain) {
@@ -425,17 +457,17 @@
                         let backPlatformSec = getSecondsOfDay(trip.airportBackPlatformStr);
                         let backDispatchSec = getSecondsOfDay(trip.airportBackDispatchStr);
 
-                        if (currentSeconds >= goDispatchSec && currentSeconds < goDispatchSec + 540) {
+                        if (checkTime >= goDispatchSec && checkTime < goDispatchSec + 540) {
                             liveTagHtml = `<span class="live-tag airport">🚄 در مسیر: غدیر 👈 فرودگاه</span>`;
-                        } else if (currentSeconds >= goDispatchSec + 540 && currentSeconds < backPlatformSec) {
+                        } else if (checkTime >= goDispatchSec + 540 && checkTime < backPlatformSec) {
                             liveTagHtml = `<span class="live-tag airport">🔄 شانت در فرودگاه</span>`;
-                        } else if (currentSeconds >= backPlatformSec && currentSeconds < backDispatchSec) {
-                            let remMainDisp = Math.ceil((backDispatchSec - currentSeconds) / 60);
+                        } else if (checkTime >= backPlatformSec && checkTime < backDispatchSec) {
+                            let remMainDisp = Math.ceil((backDispatchSec - checkTime) / 60);
                             liveTagHtml = `<span class="live-tag countdown-d">🚨 ${remMainDisp} دقیقه تا اعزام برگشت فرودگاه</span>`;
-                        } else if (currentSeconds >= backDispatchSec && currentSeconds < backDispatchSec + 540) {
+                        } else if (checkTime >= backDispatchSec && checkTime < backDispatchSec + 540) {
                             liveTagHtml = `<span class="live-tag airport">🚄 در مسیر: فرودگاه 👈 غدیر شمالی</span>`;
-                        } else if (currentSeconds >= backDispatchSec + 540 && currentSeconds < trip.dispatchSec) {
-                            let remBigDisp = Math.ceil((trip.dispatchSec - currentSeconds) / 60);
+                        } else if (checkTime >= backDispatchSec + 540 && checkTime < trip.dispatchSec) {
+                            let remBigDisp = Math.ceil((trip.dispatchSec - checkTime) / 60);
                             liveTagHtml = `<span class="live-tag countdown-d">🚨 ${remBigDisp} دقیقه تا اعزام بزرگ به وکیل‌آباد</span>`;
                         } else {
                             liveTagHtml = `<span class="live-tag moving">🟢 خط اصلی: غدیر 👈 وکیل‌آباد...</span>`;
@@ -446,23 +478,27 @@
                 } else {
                     if (isThisTripFinished) {
                         if (idx === parsedTrips.length - 1 && bestIndex === parsedTrips.length - 1) {
-                            liveTagHtml = `<span class="live-tag work" style="background:#232433; color:#8f92a1;">✓ شیفت ممتد امروز با موفقیت پایان یافت</span>`;
+                            let tomorrowLabel = isTomorrowShift ? "فردا " : "امروز ";
+                            liveTagHtml = `<span class="live-tag work" style="background:#232433; color:#8f92a1;">✓ شیفت ${tomorrowLabel}با موفقیت پایان یافت</span>`;
                         } else {
                             liveTagHtml = `<span class="live-tag work" style="background:#1b1c26; color:#555973;">✓ سیر انجام شد</span>`;
                         }
-                    } else if (isFirstTripOfAll && currentSeconds < trip.workSec) {
-                        let remSeconds = trip.workSec - currentSeconds;
+                    } else if (isFirstTripOfAll && checkTime < trip.workSec) {
+                        let remSeconds = trip.workSec - checkTime;
                         let remMin = Math.ceil(remSeconds / 60);
-                        liveTagHtml = `<span class="live-tag work">⏱️ ساعت حضور در ${placeName}: ${workTimeStr} (${remMin} دقیقه مانده تا حضور)</span>`;
+                        let tomorrowLabel = isTomorrowShift ? "فردا " : "";
+                        liveTagHtml = `<span class="live-tag work">⏱️ ساعت حضور در ${placeName}: ${tomorrowLabel}${workTimeStr} (${remMin} دقیقه مانده)</span>`;
                     } else {
                         liveTagHtml = ``;
                     }
                 }
                 
                 let arrowLabel = trip.type === "S" ? "🔵 رفت (غدیر 👈 وکیل‌آباد)" : (trip.type === "E" ? "🟡 برگشت (وکیل‌آباد 👈 غدیر)" : "🔮 زنجیره لوپ فرودگاه تا وکیل‌آباد");
+                let dayBadge = isTomorrowShift ? `<span style="font-size:10px; background:#4a148c; padding:2px 6px; border-radius:4px; margin-right:6px;">برنامه فردا</span>` : ``;
+                
                 listHtml += `<div class="trip-card ${trip.type} ${currentClass}" onclick="openGraph(${idx})">
                     <div style="flex: 1; min-width: 0;">
-                        <b>${trip.raw}</b><br>${liveTagHtml ? liveTagHtml + '<br>' : ''}
+                        <b>${trip.raw}</b> ${dayBadge}<br>${liveTagHtml ? liveTagHtml + '<br>' : ''}
                         <span style="font-size:12px; color:#8f92a1; display:inline-block; margin-top:6px;">${arrowLabel}</span>
                     </div>
                     <div style="display: flex; align-items: center;">
@@ -524,9 +560,10 @@
             }
 
             let totalVirtualSec = isAirportMode ? (2000 + 2535) : route[route.length - 1].sec;
-            let headerText = isAirportMode ? `🔮 زنجیره هوشمند داینامیک: غدیر 👈 فرودگاه 👈 غدیر 👈 وکیل‌آباد` : ((trip.type === "E") ? `📉 برگشت: وکیل‌آباد 👈 غدیر (سیر ۴۰ دقیقه‌ای)` : `📈 رفت: غدیر 👈 وکیل‌آباد (سیر ۴۳ دقیقه‌ای)`);
+            let tomorrowText = isTomorrowShift ? " [برنامه فردا] " : "";
+            let headerText = isAirportMode ? `🔮 زنجیره هوشمند داینامیک: غدیر 👈 فرودگاه 👈 غدیر 👈 وکیل‌آباد` : ((trip.type === "E") ? `📉 برگشت: وکیل‌آباد 👈 غدیر` : `📈 رفت: غدیر 👈 وکیل‌آباد`);
             
-            document.getElementById('routeHeader').innerText = headerText;
+            document.getElementById('routeHeader').innerText = headerText + tomorrowText;
             document.getElementById('routeHeader').style.color = isAirportMode ? 'var(--purple)' : ((trip.type === "E") ? 'var(--amber)' : 'var(--blue)');
 
             let html = "";
@@ -565,14 +602,9 @@
                 let isReverse = (trip.type === "S" || isAirportMode);
                 let posX = isReverse ? (1 - pct) * totalTrackWidth : pct * totalTrackWidth;
                 
-                let timeLabel = "";
-                if (station.tMode === "SHUNT") {
-                    timeLabel = `وصول: ${formatSecondsToTime(arrSec)} | شانت 🔄`;
-                } else if (station.tMode === "MAIN_ARRIVE") {
-                    timeLabel = `ورود: ${formatSecondsToTime(arrSec)} | اعزام غدیر: ${formatSecondsToTime(dispatchSec)}`;
-                } else {
-                    timeLabel = isTerminal ? formatSecondsToTime(dispatchSec) : `${formatSecondsToTime(arrSec)} - ${formatSecondsToTime(dispatchSec)}`;
-                }
+                let timeLabel = (station.tMode === "SHUNT") ? `وصول: ${formatSecondsToTime(arrSec)} | شانت 🔄` : 
+                                ((station.tMode === "MAIN_ARRIVE") ? `ورود: ${formatSecondsToTime(arrSec)} | اعزام غدیر: ${formatSecondsToTime(dispatchSec)}` : 
+                                (isTerminal ? formatSecondsToTime(dispatchSec) : `${formatSecondsToTime(arrSec)} - ${formatSecondsToTime(dispatchSec)}`));
 
                 html += `<div class="rail-station" style="left: ${posX}px;" id="stBlock_${idx}" data-arrival="${arrSec}" data-dispatch="${dispatchSec}" data-posx="${posX}">
                     <div class="st-name" id="stName_${idx}">${station.name}</div>
@@ -601,6 +633,9 @@
         function checkAndMoveTrainLive(totalStations, trip, totalVirtualSec, totalTrackWidth, isAirportMode) {
             let now = new Date();
             let currentSecondsOfDay = (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
+            
+            // هماهنگ‌سازی زنده پوینتر قطار با شیفت ممتد فردا
+            let checkTime = isTomorrowShift ? currentSecondsOfDay : currentSecondsOfDay;
             let pointer = document.getElementById('trainPointer');
             let trainPlaced = false;
             let targetBlockToScroll = null;
@@ -620,10 +655,10 @@
                 name.classList.remove('active-text');
                 countBox.style.display = "none";
 
-                if (currentSecondsOfDay >= arrSec && currentSecondsOfDay <= dispSec) {
+                if (checkTime >= arrSec && checkTime <= dispSec) {
                     dot.classList.add('active-dot');
                     name.classList.add('active-text');
-                    let remainingSeconds = dispSec - currentSecondsOfDay;
+                    let remainingSeconds = dispSec - checkTime;
                     if (remainingSeconds >= 0) {
                         countBox.innerText = `حرکت تا ${remainingSeconds} ثانیه`;
                         countBox.style.display = "block";
@@ -637,9 +672,9 @@
 
             if (!trainPlaced) {
                 let mainLineStartSec = getSecondsOfDay(trip.dispatchTime);
-                if (isAirportMode && currentSecondsOfDay < mainLineStartSec) {
+                if (isAirportMode && checkTime < mainLineStartSec) {
                     let baseStart = getSecondsOfDay(trip.airportGoPlatformStr);
-                    let elapsed = currentSecondsOfDay - baseStart;
+                    let elapsed = checkTime - baseStart;
                     let pct = Math.min(elapsed / 2000, 1);
                     pointer.style.left = ((1 - (pct * 2000 / totalVirtualSec)) * totalTrackWidth) + "px";
                     pointer.style.display = "block";
@@ -648,8 +683,8 @@
                     let tripStartSec = getSecondsOfDay(trip.dispatchTime);
                     let totalMainLineSec = (trip.type === "E") ? 2392 : 2535; 
                     
-                    if (currentSecondsOfDay >= tripStartSec && currentSecondsOfDay <= tripStartSec + totalMainLineSec) {
-                        let secondsPassed = currentSecondsOfDay - tripStartSec;
+                    if (checkTime >= tripStartSec && checkTime <= tripStartSec + totalMainLineSec) {
+                        let secondsPassed = checkTime - tripStartSec;
                         let mainPct = secondsPassed / totalMainLineSec;
                         
                         let virtualSecNow = isAirportMode ? (2000 + (mainPct * 2535)) : (mainPct * totalMainLineSec);
