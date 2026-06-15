@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>گرافیک خطی سیر راهبران - نسخه 1.16</title>
+    <title>گرافیک خطی سیر راهبران - نسخه 1.17</title>
     <style>
         :root {
             --bg: #0c0d14;
@@ -154,8 +154,9 @@
 <body>
 
     <div id="homePage" class="page active">
-        <h2>📋 سیستم تنظیم هوشمند شیفت راهبران - نسخه 1.16</h2>
+        <h2>📋 سیستم تنظیم هوشمند شیفت راهبران - نسخه 1.17</h2>
         
+        <!-- ورود دستی -->
         <div class="section-box">
             <h3>⚠️ ورود دستی برنامه (مواقع اضطراری)</h3>
             <div class="manual-row">
@@ -179,6 +180,7 @@
             <button class="btn-blue" onclick="addManualTrip()">➕ ثبت و پردازش دستی قطار</button>
         </div>
 
+        <!-- ورودی‌های پیامک -->
         <div class="section-box">
             <h3>📥 استخراج از روی متن پیامک‌ها</h3>
             <label style="font-size: 11px; color: #8f92a1; display:block; margin-bottom:4px;">۱. متن پیامک خط اصلی (وکیل‌آباد/غدیر)</label>
@@ -195,6 +197,7 @@
         <div id="tripsList" style="margin-top: 5px;"></div>
     </div>
 
+    <!-- صفحه گراف ریلی -->
     <div id="graphPage" class="page" style="max-width: 100%;">
         <button onclick="showHome()" style="background: #262837; color: white; width: auto; padding: 10px 20px; margin-bottom: 15px;">🔙 بازگشت به لیست</button>
         <div id="routeHeader" class="route-info"></div>
@@ -276,7 +279,6 @@
 
             let platformSec = getSecondsOfDay(platformTime);
             let dispatchSec = getSecondsOfDay(dispatchTime);
-            
             let workSec = (type === "E") ? (dispatchSec - (20 * 60)) : (platformSec - (30 * 60));
 
             let label = type === "S" ? "غدیر" : (type === "E" ? "وکیل‌آباد" : "لوپ کامل فرودگاه");
@@ -330,18 +332,16 @@
                         let pT = times[0], dT = times[1];  
                         let pS = getSecondsOfDay(pT), dS = getSecondsOfDay(dT);
                         
-                        // ⚡ تشخیص هوشمند کدهای وضعیت حروف (P یا R) نسخه 1.16
                         let statusPart = clean.split(dT)[1] || "";
-                        let isTerminalEntry = /P-/i.test(statusPart); // بررسی ورود از پایانه
-                        let isToParking = /-P/i.test(statusPart);     // بررسی خروج به پارکینگ
+                        let isTerminalEntry = /P-/i.test(statusPart); 
+                        let isToParking = /-P/i.test(statusPart);     
 
-                        // محاسبه زمان حضور بر اساس قانون پایانه (P) یا رینگ (R)
                         let baseMinutes = 0;
                         if (type === "E") {
-                            baseMinutes = isTerminalEntry ? 30 : 20; // ۳۰ دقیقه پایانه وکیل‌آباد، ۲۰ دقیقه رینگ
+                            baseMinutes = isTerminalEntry ? 30 : 20; 
                             wS = dS - (baseMinutes * 60);
                         } else {
-                            baseMinutes = isTerminalEntry ? 40 : 30; // ۴۰ دقیقه پایانه غدیر، ۳۰ دقیقه رینگ
+                            baseMinutes = isTerminalEntry ? 40 : 30; 
                             wS = pS - (baseMinutes * 60);
                         }
                         
@@ -373,10 +373,11 @@
                         matchTrip.airportBackPlatformStr = backPlatformStr;
                         matchTrip.airportBackDispatchStr = backDispatchStr;
                         
-                        // بازنویسی زمان حضور لوپ فرودگاه بر اساس ورود از پایانه یا رینگ
                         let baseMinutes = matchTrip.isTerminalEntry ? 40 : 30;
                         matchTrip.workSec = getSecondsOfDay(goPlatformStr) - (baseMinutes * 60);
-                        matchTrip.raw = `✈️ لوپ زنجیره‌ای فرودگاه | رفت فرودگاه: ${goDispatchStr} | برگشت: ${backDispatchStr} | اعزام خط اصلی غدیر: ${matchTrip.dispatchTime}`;
+                        
+                        // ⚡ اصلاح متنی لیبل فرودگاهی مطابق درخواست شما نسخه 1.17
+                        matchTrip.raw = `✈️ لوپ زنجیره‌ای فرودگاه | غدیر به فرودگاه : ${goDispatchStr} | فرودگاه به غدیر : ${backDispatchStr} | اعزام به خط اصلی از غدیر: ${matchTrip.dispatchTime}`;
                     }
                 }
             }
@@ -384,7 +385,6 @@
             if (tempTrips.length === 0) return;
             tempTrips.sort((a, b) => a.dispatchSec - b.dispatchSec);
 
-            // محاسبه نهایی زمان حضور اولین قطار
             let firstTrip = tempTrips[0];
             let baseMinutes = 0;
             if (firstTrip.type === "E") {
@@ -481,7 +481,6 @@
                         let remMin = Math.ceil((targetDispatchSec - checkTime) / 60);
                         liveTagHtml = `<span class="live-tag countdown-d">🚨 ${remMin} دقیقه مانده تا اعزام</span>`;
                     } 
-                    // ⚡ قطع ممتد شیفت در صورت خروج به پارکینگ نسخه 1.16
                     else if (trip.isToParking) {
                         liveTagHtml = `<span class="live-tag work" style="background:#ccff90; color:black;">🅿️ قطار در حال خروج از خط به پارکینگ (پایان فرآیند شیفت)</span>`;
                     }
@@ -531,7 +530,6 @@
                 let arrowLabel = trip.type === "S" ? "🔵 رفت (غدیر 👈 وکیل‌آباد)" : (trip.type === "E" ? "🟡 برگشت (وکیل‌آباد 👈 غدیر)" : "🔮 زنجیره لوپ فرودگاه تا وکیل‌آباد");
                 let dayBadge = isTomorrowShift ? `<span style="font-size:10px; background:#4a148c; padding:2px 6px; border-radius:4px; margin-right:6px;">برنامه فردا</span>` : ``;
                 
-                // برچسب نوع ورود قطار جهت خوانایی عالی راهبران
                 let entryLabel = trip.isTerminalEntry ? ` <span style="font-size:10px; background:#ff6f00; color:white; padding:1px 5px; border-radius:3px;">📥 ورودی پایانه</span>` : ``;
                 let exitLabel = trip.isToParking ? ` <span style="font-size:10px; background:#b71c1c; color:white; padding:1px 5px; border-radius:3px;">🅿️ خروج پارکینگ</span>` : ``;
 
@@ -648,9 +646,9 @@
                 
                 let timeLabel = "";
                 if (station.tMode === "SHUNT") {
-                    timeLabel = `وصول: ${formatSecondsToTime(arrSec)} | اعزام فرودگاه: ${formatSecondsToTime(dispatchSec)}`;
+                    timeLabel = `وصول: ${formatSecondsToTime(arrSec)} | غدیر به فرودگاه : ${formatSecondsToTime(dispatchSec)}`;
                 } else if (station.tMode === "MAIN_ARRIVE") {
-                    timeLabel = `ورود: ${formatSecondsToTime(arrSec)} | اعزام خط اصلی: ${formatSecondsToTime(dispatchSec)}`;
+                    timeLabel = `ورود: ${formatSecondsToTime(arrSec)} | اعزام به خط اصلی از غدیر: ${formatSecondsToTime(dispatchSec)}`;
                 } else {
                     timeLabel = isTerminal ? formatSecondsToTime(dispatchSec) : `${formatSecondsToTime(arrSec)} - ${formatSecondsToTime(dispatchSec)}`;
                 }
@@ -726,7 +724,6 @@
                     pointer.style.left = ((1 - (pct * 2000 / totalVirtualSec)) * totalTrackWidth) + "px";
                     pointer.style.display = "block";
                     trainPlaced = true;
-                    targetBlockToScroll = null;
                 } else {
                     let tripStartSec = getSecondsOfDay(trip.dispatchTime);
                     let totalMainLineSec = (trip.type === "E") ? 2392 : 2535; 
