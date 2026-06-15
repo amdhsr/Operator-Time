@@ -156,6 +156,7 @@
     <div id="homePage" class="page active">
         <h2>📋 سیستم تنظیم هوشمند شیفت راهبران</h2>
         
+        <!-- ورود دستی -->
         <div class="section-box">
             <h3>⚠️ ورود دستی برنامه (مواقع اضطراری)</h3>
             <div class="manual-row">
@@ -179,6 +180,7 @@
             <button class="btn-blue" onclick="addManualTrip()">➕ ثبت و پردازش دستی قطار</button>
         </div>
 
+        <!-- ورودی‌های پیامک -->
         <div class="section-box">
             <h3>📥 استخراج از روی متن پیامک‌ها</h3>
             <label style="font-size: 11px; color: #8f92a1; display:block; margin-bottom:4px;">۱. متن پیامک خط اصلی (وکیل‌آباد/غدیر)</label>
@@ -188,15 +190,14 @@
             <textarea id="airportSmsInput" placeholder="اگر پیامک انشعاب فرودگاه دارید، اینجا پیست کنید (اختیاری)..."></textarea>
             
             <button class="btn-blue" onclick="parseSms(false)">📊 استخراج گراف ریلی یکپارچه</button>
-            
             <button id="tomorrowBtn" class="btn-purple" onclick="parseSms(true)">🗓️ بله، این برنامه فرداست (محاسبه با زمان فردا)</button>
-            
             <button class="btn-red" onclick="clearAllData()">🗑️ حذف و پاکسازی کل اطلاعات</button>
         </div>
 
         <div id="tripsList" style="margin-top: 5px;"></div>
     </div>
 
+    <!-- صفحه گراف ریلی -->
     <div id="graphPage" class="page" style="max-width: 100%;">
         <button onclick="showHome()" style="background: #262837; color: white; width: auto; padding: 10px 20px; margin-bottom: 15px;">🔙 بازگشت به لیست</button>
         <div id="routeHeader" class="route-info"></div>
@@ -236,20 +237,19 @@
         let currentActiveInterval = null;
         let homePageInterval = null; 
         let lastInteractionTime = 0; 
-        let isTomorrowShift = false; // فلگ هوشمند تشخیص شیفت فردا
+        let isTomorrowShift = false;
 
         function logUserInteraction() { lastInteractionTime = Date.now(); }
 
         function getSecondsOfDay(timeStr, offsetSeconds = 0) {
             let parts = timeStr.split(':');
             let baseSec = (parseInt(parts[0]) * 3600) + (parseInt(parts[1]) * 60) + offsetSeconds;
-            // ⚡ اگر تایید شده بود که شیفت فرداست، ۸۶۴۰۰ ثانیه (یک شبانه‌روز) به زمان قطارها اضافه می‌شود
             if (isTomorrowShift) baseSec += 86400; 
             return baseSec;
         }
 
         function formatSecondsToTime(totalSeconds) {
-            let actualSec = totalSeconds % 86400; // کسر ۲۴ ساعت اضافی برای نمایش درست ساعت
+            let actualSec = totalSeconds % 86400; 
             let h = Math.floor(actualSec / 3600) % 24;
             let m = Math.floor((actualSec % 3600) / 60);
             return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
@@ -292,9 +292,9 @@
 
             if(type === "F") {
                 item.airportGoPlatformStr = platformTime; 
-                item.airportGoDispatchStr = formatSecondsToTime(platformSec + 180); 
-                item.airportBackPlatformStr = formatSecondsToTime(platformSec + 780); 
-                item.airportBackDispatchStr = formatSecondsToTime(platformSec + 1860); 
+                item.airportGoDispatchStr = dispatchTime; 
+                item.airportBackPlatformStr = formatSecondsToTime(dispatchSec + 600); 
+                item.airportBackDispatchStr = formatSecondsToTime(dispatchSec + 1200); 
             }
 
             parsedTrips.push(item);
@@ -303,7 +303,7 @@
         }
 
         function parseSms(forceTomorrow = false) {
-            isTomorrowShift = forceTomorrow; // ست کردن وضعیت بر اساس کلیک کاربر
+            isTomorrowShift = forceTomorrow;
             document.getElementById('tomorrowBtn').style.display = "none";
 
             let mainText = document.getElementById('mainSmsInput').value;
@@ -342,13 +342,14 @@
                 }
             });
 
+            // ⚡ همگام‌سازی داینامیک ۱۰۰٪ دقیق با زمان‌های واقعی پیامک فرودگاه
             if (filteredAirportLines.length >= 2) {
                 let firstLineTimes = filteredAirportLines[0].match(/(\d{1,2}):(\d{2})/g);
                 let secondLineTimes = filteredAirportLines[1].match(/(\d{1,2}):(\d{2})/g);
 
                 if (firstLineTimes && secondLineTimes) {
                     let goPlatformStr = firstLineTimes[0];   
-                    let goDispatchStr = firstLineTimes[1];   
+                    let goDispatchStr = firstLineTimes[1];   // ساعت ۷:۱۰ واقعی اعزام به فرودگاه
                     let backPlatformStr = secondLineTimes[0]; 
                     let backDispatchStr = secondLineTimes[1]; 
 
@@ -362,23 +363,19 @@
                         matchTrip.airportBackDispatchStr = backDispatchStr;
                         
                         matchTrip.workSec = getSecondsOfDay(goPlatformStr) - (30 * 60);
-                        matchTrip.raw = `✈️ لوپ زنجیره‌ای فرودگاه | رفت فرودگاه: ${goDispatchStr} | برگشت: ${backDispatchStr} | اعزام بزرگ غدیر: ${matchTrip.dispatchTime}`;
+                        matchTrip.raw = `✈️ لوپ زنجیره‌ای فرودگاه | رفت فرودگاه: ${goDispatchStr} | برگشت: ${backDispatchStr} | اعزام خط اصلی غدیر: ${matchTrip.dispatchTime}`;
                     }
                 }
             }
 
             if (tempTrips.length === 0) return;
-
             tempTrips.sort((a, b) => a.dispatchSec - b.dispatchSec);
 
-            // ⚡ چت‌باکس هوشمند تشخیص انقضای زمان کل لیست
             let now = new Date();
             let currentSeconds = (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
-            
             let lastTrip = tempTrips[tempTrips.length - 1];
             let totalMainLineSec = (lastTrip.type === "E") ? 2392 : 2535;
             
-            // اگر بدون تایید فردا، ساعت فعلی از پایان آخرین قطار رد شده بود: دکمه فردا را نشان بده
             if (!isTomorrowShift && currentSeconds > (lastTrip.dispatchSec + totalMainLineSec)) {
                 document.getElementById('tomorrowBtn').style.display = "block";
             }
@@ -399,9 +396,7 @@
             if (parsedTrips.length === 0) { document.getElementById('tripsList').innerHTML = ""; return; }
             let now = new Date();
             let currentSeconds = (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
-            
-            // اگر سیستم روی مود فرودگاهی فردا فیکس شده بود، زمان گوشی را با اضافه کردن یک روز با سرور هماهنگ کن
-            let checkTime = isTomorrowShift ? currentSeconds : currentSeconds;
+            let checkTime = currentSeconds;
 
             let bestIndex = -1;
             for(let i = 0; i < parsedTrips.length; i++) {
@@ -440,7 +435,6 @@
                     if (isFirstTripOfAll && checkTime < trip.workSec) {
                         let remSeconds = trip.workSec - checkTime;
                         let remMin = Math.ceil(remSeconds / 60);
-                        // کلمه فردا در صورت لزوم اضافه می‌شود
                         let tomorrowLabel = isTomorrowShift ? "فردا " : "";
                         liveTagHtml = `<span class="live-tag work">⏱️ ساعت حضور در ${placeName}: ${tomorrowLabel}${workTimeStr} (${remMin} دقیقه مانده)</span>`;
                     } 
@@ -468,7 +462,7 @@
                             liveTagHtml = `<span class="live-tag airport">🚄 در مسیر: فرودگاه 👈 غدیر شمالی</span>`;
                         } else if (checkTime >= backDispatchSec + 540 && checkTime < trip.dispatchSec) {
                             let remBigDisp = Math.ceil((trip.dispatchSec - checkTime) / 60);
-                            liveTagHtml = `<span class="live-tag countdown-d">🚨 ${remBigDisp} دقیقه تا اعزام بزرگ به وکیل‌آباد</span>`;
+                            liveTagHtml = `<span class="live-tag countdown-d">🚨 ${remBigDisp} دقیقه تا اعزام خط اصلی به وکیل‌آباد</span>`;
                         } else {
                             liveTagHtml = `<span class="live-tag moving">🟢 خط اصلی: غدیر 👈 وکیل‌آباد...</span>`;
                         }
@@ -525,10 +519,16 @@
                 track.classList.add('airport-extended');
                 totalTrackWidth = 3500; 
 
+                // ⚡ زمان‌بندی گراف لوپ فرودگاه هماهنگ با تصویر و پیامک
+                let goPlatformSec = getSecondsOfDay(trip.airportGoPlatformStr);
+                let goDispatchSec = getSecondsOfDay(trip.airportGoDispatchStr); // ساعت ۷:۱۰ واقعی
+                let backPlatformSec = getSecondsOfDay(trip.airportBackPlatformStr);
+                let backDispatchSec = getSecondsOfDay(trip.airportBackDispatchStr);
+
                 route = [
                     {"name": "غدیر (شروع رفت فرودگاه)", "sec": 0, "isEx": true, "tMode": "GO_PLAT"},
-                    {"name": "بوستان ریحان (رفت)", "sec": 343, "isEx": true, "tMode": "GO_REY"},
-                    {"name": "فرودگاه (۳دقیقه شانت 🔄)", "sec": 540, "isEx": true, "tMode": "SHUNT"}, 
+                    {"name": "بوستان ریحان (رفت)", "sec": Math.floor((goDispatchSec - goPlatformSec) * 0.5), "isEx": true, "tMode": "GO_REY"},
+                    {"name": "فرودگاه (۳دقیقه شانت 🔄)", "sec": (goDispatchSec - goPlatformSec), "isEx": true, "tMode": "SHUNT"}, 
                     {"name": "فرودگاه (سکوی شمالی برگشت)", "sec": 1200, "isEx": true, "tMode": "BACK_START"},
                     {"name": "بوستان ریحان (برگشت)", "sec": 1200 + 188, "isEx": true, "tMode": "BACK_REY"},
                     {"name": "غدیر (وصول شمالی سکو)", "sec": 1200 + 540, "isEx": true, "tMode": "MAIN_ARRIVE"}, 
@@ -574,8 +574,9 @@
                 if (isAirportMode) {
                     if (station.isEx) {
                         if (station.tMode === "GO_PLAT") dispatchSec = getSecondsOfDay(trip.airportGoPlatformStr);
-                        else if (station.tMode === "GO_REY") dispatchSec = getSecondsOfDay(trip.airportGoDispatchStr) + 343;
-                        else if (station.tMode === "SHUNT") dispatchSec = getSecondsOfDay(trip.airportGoDispatchStr) + 540; 
+                        else if (station.tMode === "GO_REY") dispatchSec = getSecondsOfDay(trip.airportGoPlatformStr) + Math.floor((getSecondsOfDay(trip.airportGoDispatchStr) - getSecondsOfDay(trip.airportGoPlatformStr)) * 0.5);
+                        else if (station.tMode === "GO_REY") dispatchSec = getSecondsOfDay(trip.airportGoPlatformStr) + 300;
+                        else if (station.tMode === "SHUNT") dispatchSec = getSecondsOfDay(trip.airportGoDispatchStr); 
                         else if (station.tMode === "BACK_START") dispatchSec = getSecondsOfDay(trip.airportBackDispatchStr); 
                         else if (station.tMode === "BACK_REY") dispatchSec = getSecondsOfDay(trip.airportBackDispatchStr) + 188;
                         else if (station.tMode === "MAIN_ARRIVE") dispatchSec = getSecondsOfDay(trip.airportBackDispatchStr) + 540; 
@@ -589,8 +590,8 @@
                 let arrSec = isTerminal ? dispatchSec : dispatchSec - 30;
                 
                 if (station.tMode === "SHUNT") {
-                    arrSec = getSecondsOfDay(trip.airportGoDispatchStr) + 540; 
-                    dispatchSec = getSecondsOfDay(trip.airportBackPlatformStr); 
+                    arrSec = getSecondsOfDay(trip.airportGoPlatformStr) + 540; 
+                    dispatchSec = getSecondsOfDay(trip.airportGoDispatchStr); // فیکس شدن کامل روی ۷:۱۰ پیامک شما
                 }
                 if (station.tMode === "MAIN_ARRIVE") {
                     arrSec = getSecondsOfDay(trip.airportBackDispatchStr) + 540; 
@@ -602,9 +603,14 @@
                 let isReverse = (trip.type === "S" || isAirportMode);
                 let posX = isReverse ? (1 - pct) * totalTrackWidth : pct * totalTrackWidth;
                 
-                let timeLabel = (station.tMode === "SHUNT") ? `وصول: ${formatSecondsToTime(arrSec)} | شانت 🔄` : 
-                                ((station.tMode === "MAIN_ARRIVE") ? `ورود: ${formatSecondsToTime(arrSec)} | اعزام غدیر: ${formatSecondsToTime(dispatchSec)}` : 
-                                (isTerminal ? formatSecondsToTime(dispatchSec) : `${formatSecondsToTime(arrSec)} - ${formatSecondsToTime(dispatchSec)}`));
+                let timeLabel = "";
+                if (station.tMode === "SHUNT") {
+                    timeLabel = `وصول: ${formatSecondsToTime(arrSec)} | اعزام فرودگاه: ${formatSecondsToTime(dispatchSec)}`;
+                } else if (station.tMode === "MAIN_ARRIVE") {
+                    timeLabel = `ورود: ${formatSecondsToTime(arrSec)} | اعزام خط اصلی: ${formatSecondsToTime(dispatchSec)}`;
+                } else {
+                    timeLabel = isTerminal ? formatSecondsToTime(dispatchSec) : `${formatSecondsToTime(arrSec)} - ${formatSecondsToTime(dispatchSec)}`;
+                }
 
                 html += `<div class="rail-station" style="left: ${posX}px;" id="stBlock_${idx}" data-arrival="${arrSec}" data-dispatch="${dispatchSec}" data-posx="${posX}">
                     <div class="st-name" id="stName_${idx}">${station.name}</div>
@@ -633,9 +639,7 @@
         function checkAndMoveTrainLive(totalStations, trip, totalVirtualSec, totalTrackWidth, isAirportMode) {
             let now = new Date();
             let currentSecondsOfDay = (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
-            
-            // هماهنگ‌سازی زنده پوینتر قطار با شیفت ممتد فردا
-            let checkTime = isTomorrowShift ? currentSecondsOfDay : currentSecondsOfDay;
+            let checkTime = currentSecondsOfDay;
             let pointer = document.getElementById('trainPointer');
             let trainPlaced = false;
             let targetBlockToScroll = null;
