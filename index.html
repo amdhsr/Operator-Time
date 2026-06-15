@@ -301,7 +301,8 @@
             let filteredAirportLines = [];
             airportLines.forEach(l => {
                 let clean = l.trim();
-                if (/^[SE]\)/i.test(clean)) filteredAirportLines.push(clean);
+                // ⚡ حذف علامت ^ برای برداشتن حساسیت شروع خط
+                if (/[SE]\)/i.test(clean)) filteredAirportLines.push(clean);
             });
 
             let tempTrips = [];
@@ -309,8 +310,9 @@
             mainLines.forEach((line) => {
                 let clean = line.trim();
                 let type = "";
-                if (/^S\)/i.test(clean)) type = "S";
-                else if (/^E\)/i.test(clean)) type = "E";
+                // ⚡ اصلاح رگولار اکسپرسیون برای پیدا کردن علامت مبدا در هر کجای خط
+                if (/S\)/i.test(clean)) type = "S";
+                else if (/E\)/i.test(clean)) type = "E";
                 
                 if(type) {
                     let times = clean.match(/(\d{1,2}):(\d{2})/g);
@@ -371,7 +373,6 @@
             let now = new Date();
             let currentSeconds = (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
 
-            // ⚡ موتور تشخیص زنده قطار فعال جاری بر اساس چرخه‌ی ممتد
             let bestIndex = -1;
             for(let i = 0; i < parsedTrips.length; i++) {
                 let trip = parsedTrips[i];
@@ -403,4 +404,4 @@
                 let isThisTripFinished = (currentSeconds > trip.dispatchSec + totalMainLineSec);
 
                 if (isCurrent && !isThisTripFinished) {
-                    let targetPlatformSec = trip.isAirportChain ? getSecondsOfDay(trip.airportGoPlatfo
+                    let targe
