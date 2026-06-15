@@ -187,7 +187,6 @@
             <textarea id="airportSmsInput" placeholder="اگر پیامک انشعاب فرودگاه دارید، اینجا پیست کنید (اختیاری)..."></textarea>
             
             <button class="btn-blue" onclick="parseSms()">📊 استخراج گراف ریلی یکپارچه</button>
-            
             <button class="btn-red" onclick="clearAllData()">🗑️ حذف و پاکسازی کل اطلاعات</button>
         </div>
 
@@ -247,7 +246,6 @@
             return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
         }
 
-        // ⚡ تابع جدید پاکسازی همگانی داده‌ها
         function clearAllData() {
             if (confirm("آیا از حذف کل لیست اعزام‌ها و خالی کردن کادرهای پیامک اطمینان دارید؟")) {
                 document.getElementById('mainSmsInput').value = "";
@@ -373,20 +371,25 @@
             let now = new Date();
             let currentSeconds = (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
 
-            let bestIndex = -1, minDiff = Infinity;
-            parsedTrips.forEach((trip, idx) => {
-                let diff = trip.dispatchSec - currentSeconds;
-                if (diff >= -3500 && diff < minDiff) { minDiff = diff; bestIndex = idx; }
-            });
+            // ⚡ بازنویسی موتور فیلتر زنده: پیدا کردن اولین قطاری که هنوز سیرش تمام نشده است
+            let bestIndex = -1;
+            for(let i = 0; i < parsedTrips.length; i++) {
+                let trip = parsedTrips[i];
+                let totalMainLineSec = (trip.type === "E") ? 2392 : 2535;
+                let tripEndSec = trip.dispatchSec + totalMainLineSec;
+                
+                if (currentSeconds <= tripEndSec) {
+                    bestIndex = i;
+                    break;
+                }
+            }
+            // اگر همه قطارهای روز تمام شده بودند، آخرین قطار را فعال نگه دار
+            if (bestIndex === -1) bestIndex = parsedTrips.length - 1;
 
             let firstTrip = parsedTrips[0];
-            if (firstTrip.type === "E") {
-                firstTrip.workSec = firstTrip.dispatchSec - (20 * 60); 
-            } else if (firstTrip.type === "F") {
-                firstTrip.workSec = getSecondsOfDay(firstTrip.airportGoPlatformStr) - (30 * 60); 
-            } else {
-                firstTrip.workSec = firstTrip.platformSec - (30 * 60); 
-            }
+            if (firstTrip.type === "E") { firstTrip.workSec = firstTrip.dispatchSec - (20 * 60); } 
+            else if (firstTrip.type === "F") { firstTrip.workSec = getSecondsOfDay(firstTrip.airportGoPlatformStr) - (30 * 60); } 
+            else { firstTrip.workSec = firstTrip.platformSec - (30 * 60); }
 
             let listHtml = "";
             parsedTrips.forEach((trip, idx) => {
@@ -436,20 +439,21 @@
                             liveTagHtml = `<span class="live-tag moving">🟢 خط اصلی: غدیر 👈 وکیل‌آباد...</span>`;
                         }
                     } else {
-                        let totalMainLineSec = (trip.type === "E") ? 2392 : 2535;
-                        if (currentSeconds <= trip.dispatchSec + totalMainLineSec) {
-                            liveTagHtml = `<span class="live-tag moving">🟢 در حال سیر در خط اصلی...</span>`;
-                        } else {
-                            liveTagHtml = `<span class="live-tag work">🏁 پایان شیفت</span>`;
-                        }
+                        liveTagHtml = `<span class="live-tag moving">🟢 در حال سیر در خط اصلی...</span>`;
                     }
                 } else {
+                    // برای قطارهای تمام شده یا قطارهای آینده در حالت ممتد
                     if (isFirstTripOfAll && currentSeconds < trip.workSec) {
                         let remSeconds = trip.workSec - currentSeconds;
                         let remMin = Math.ceil(remSeconds / 60);
                         liveTagHtml = `<span class="live-tag work">⏱️ ساعت حضور در ${placeName}: ${workTimeStr} (${remMin} دقیقه مانده تا حضور)</span>`;
                     } else {
-                        liveTagHtml = ``;
+                        let totalMainLineSec = (trip.type === "E") ? 2392 : 2535;
+                        if (currentSeconds > trip.dispatchSec + totalMainLineSec) {
+                            liveTagHtml = `<span class="live-tag work" style="background:#252736; color:#8f92a1;">✓ سیر انجام شد</span>`;
+                        } else {
+                            liveTagHtml = ``;
+                        }
                     }
                 }
                 
