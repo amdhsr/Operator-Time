@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>گرافیک خطی سیر راهبران - نسخه 1.18</title>
+    <title>گرافیک خطی سیر راهبران - نسخه 1.19</title>
     <style>
         :root {
             --bg: #0c0d14;
@@ -154,7 +154,7 @@
 <body>
 
     <div id="homePage" class="page active">
-        <h2>📋 سیستم تنظیم هوشمند شیفت راهبران - نسخه 1.18</h2>
+        <h2>📋 سیستم تنظیم هوشمند شیفت راهبران - نسخه 1.19</h2>
         
         <div class="section-box">
             <h3>⚠️ ورود دستی برنامه (مواقع اضطراری)</h3>
@@ -252,6 +252,27 @@
             return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
         }
 
+        // ⚡ تابع جدید هوشمند برای تبدیل ثانیه‌ها به فرمت ملموس ساعت و دقیقه (برای صفحه اصلی)
+        function formatRemainingTime(totalSeconds) {
+            if (totalSeconds <= 0) return "0 دقیقه";
+            let totalMinutes = Math.ceil(totalSeconds / 60);
+            let hours = Math.floor(totalMinutes / 60);
+            let mins = totalMinutes % 60;
+            
+            if (hours > 0) {
+                return `${hours} ساعت و ${mins} دقیقه`;
+            }
+            return `${mins} دقیقه`;
+        }
+
+        // ⚡ تابع جدید تبدیل ثانیه به فرمت دیجیتال MM:SS (برای شمارشگر معکوس ایستگاه‌ها)
+        function formatDigitalCounter(totalSeconds) {
+            if (totalSeconds <= 0) return "00:00";
+            let m = Math.floor(totalSeconds / 60);
+            let s = totalSeconds % 60;
+            return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        }
+
         function clearAllData() {
             if (confirm("آیا از حذف کل لیست اعزام‌ها و خالی کردن کادرهای پیامک اطمینان دارید؟")) {
                 document.getElementById('mainSmsInput').value = "";
@@ -277,7 +298,6 @@
             let platformSec = getSecondsOfDay(platformTime);
             let dispatchSec = getSecondsOfDay(dispatchTime);
             
-            // پیش‌فرض رینگ برای محاسبه حضور دستی بر اساس ساعت اعزام
             let workSec = (type === "E") ? (dispatchSec - (20 * 60)) : (dispatchSec - (30 * 60));
 
             let label = type === "S" ? "غدیر" : (type === "E" ? "وکیل‌آباد" : "لوپ کامل فرودگاه");
@@ -335,7 +355,6 @@
                         let isTerminalEntry = /P-/i.test(statusPart); 
                         let isToParking = /-P/i.test(statusPart);     
 
-                        // ⚡ اصلاح مهندسی معکوس نسخه 1.18: زمان حضور تماماً از ساعت اعزام (dS) کسر می‌شود
                         let baseMinutes = 0;
                         if (type === "E") {
                             baseMinutes = isTerminalEntry ? 30 : 20; 
@@ -372,7 +391,6 @@
                         matchTrip.airportBackPlatformStr = backPlatformStr;
                         matchTrip.airportBackDispatchStr = backDispatchStr;
                         
-                        // ⚡ در فرودگاهی هم ملاک کسر دقیقه، ساعت اعزام رفت فرودگاه (goDispatchStr) قرار گرفت
                         let baseMinutes = matchTrip.isTerminalEntry ? 40 : 30;
                         matchTrip.workSec = getSecondsOfDay(goDispatchStr) - (baseMinutes * 60);
                         
@@ -384,7 +402,6 @@
             if (tempTrips.length === 0) return;
             tempTrips.sort((a, b) => a.dispatchSec - b.dispatchSec);
 
-            // محاسبه مجدد و قطعی برای قطار اول کل روز بر اساس اعزام
             let firstTrip = tempTrips[0];
             let baseMinutes = 0;
             if (firstTrip.type === "E") {
@@ -437,7 +454,6 @@
                 }
             }
 
-            // فیکس رندر زنده نسخه 1.18 از روی اعزام قطار اول
             let firstTrip = parsedTrips[0];
             let baseMin = 0;
             if (firstTrip.type === "E") { 
@@ -470,17 +486,17 @@
 
                     if (isFirstTripOfAll && checkTime < trip.workSec) {
                         let remSeconds = trip.workSec - checkTime;
-                        let remMin = Math.ceil(remSeconds / 60);
                         let tomorrowLabel = isTomorrowShift ? "فردا " : "";
-                        liveTagHtml = `<span class="live-tag work">⏱️ ساعت حضور در ${placeName}: ${tomorrowLabel}${workTimeStr} (${remMin} دقیقه مانده)</span>`;
+                        // ⚡ اصلاح فرمت نمایش به ساعت و دقیقه در صفحه اول
+                        liveTagHtml = `<span class="live-tag work">⏱️ ساعت حضور در ${placeName}: ${tomorrowLabel}${workTimeStr} (${formatRemainingTime(remSeconds)} مانده)</span>`;
                     } 
                     else if (checkTime >= (isFirstTripOfAll ? trip.workSec : 0) && checkTime < targetPlatformSec) {
-                        let remMin = Math.ceil((targetPlatformSec - checkTime) / 60);
-                        liveTagHtml = `<span class="live-tag countdown-p">⏳ ${remMin} دقیقه مانده تا اولین سکو</span>`;
+                        let remSec = targetPlatformSec - checkTime;
+                        liveTagHtml = `<span class="live-tag countdown-p">⏳ ${formatRemainingTime(remSec)} مانده تا اولین سکو</span>`;
                     } 
                     else if (checkTime >= targetPlatformSec && checkTime < targetDispatchSec) {
-                        let remMin = Math.ceil((targetDispatchSec - checkTime) / 60);
-                        liveTagHtml = `<span class="live-tag countdown-d">🚨 ${remMin} دقیقه مانده تا اعزام</span>`;
+                        let remSec = targetDispatchSec - checkTime;
+                        liveTagHtml = `<span class="live-tag countdown-d">🚨 ${formatRemainingTime(remSec)} مانده تا اعزام</span>`;
                     } 
                     else if (trip.isToParking) {
                         liveTagHtml = `<span class="live-tag work" style="background:#ccff90; color:black;">🅿️ قطار در حال خروج از خط به پارکینگ (پایان فرآیند شیفت)</span>`;
@@ -495,13 +511,13 @@
                         } else if (checkTime >= goDispatchSec + 540 && checkTime < backPlatformSec) {
                             liveTagHtml = `<span class="live-tag airport">🔄 شانت در فرودگاه</span>`;
                         } else if (checkTime >= backPlatformSec && checkTime < backDispatchSec) {
-                            let remMainDisp = Math.ceil((backDispatchSec - checkTime) / 60);
-                            liveTagHtml = `<span class="live-tag countdown-d">🚨 ${remMainDisp} دقیقه تا اعزام برگشت فرودگاه</span>`;
+                            let remMainDisp = backDispatchSec - checkTime;
+                            liveTagHtml = `<span class="live-tag countdown-d">🚨 ${formatRemainingTime(remMainDisp)} تا اعزام برگشت فرودگاه</span>`;
                         } else if (checkTime >= backDispatchSec && checkTime < backDispatchSec + 540) {
                             liveTagHtml = `<span class="live-tag airport">🚄 در مسیر: فرودگاه 👈 غدیر شمالی</span>`;
                         } else if (checkTime >= backDispatchSec + 540 && checkTime < trip.dispatchSec) {
-                            let remBigDisp = Math.ceil((trip.dispatchSec - checkTime) / 60);
-                            liveTagHtml = `<span class="live-tag countdown-d">🚨 ${remBigDisp} دقیقه تا اعزام خط اصلی به وکیل‌آباد</span>`;
+                            let remBigDisp = trip.dispatchSec - checkTime;
+                            liveTagHtml = `<span class="live-tag countdown-d">🚨 ${formatRemainingTime(remBigDisp)} تا اعزام خط اصلی به وکیل‌آباد</span>`;
                         } else {
                             liveTagHtml = `<span class="live-tag moving">🟢 خط اصلی: غدیر 👈 وکیل‌آباد...</span>`;
                         }
@@ -520,9 +536,8 @@
                         }
                     } else if (isFirstTripOfAll && checkTime < trip.workSec) {
                         let remSeconds = trip.workSec - checkTime;
-                        let remMin = Math.ceil(remSeconds / 60);
                         let tomorrowLabel = isTomorrowShift ? "فردا " : "";
-                        liveTagHtml = `<span class="live-tag work">⏱️ ساعت حضور در ${placeName}: ${tomorrowLabel}${workTimeStr} (${remMin} دقیقه مانده)</span>`;
+                        liveTagHtml = `<span class="live-tag work">⏱️ ساعت حضور در ${placeName}: ${tomorrowLabel}${workTimeStr} (${formatRemainingTime(remSeconds)} مانده)</span>`;
                     } else {
                         liveTagHtml = ``;
                     }
@@ -647,9 +662,9 @@
                 
                 let timeLabel = "";
                 if (station.tMode === "SHUNT") {
-                    timeLabel = `وصول: ${formatSecondsToTime(arrSec)} | غدیر به فرودگاه : ${formatSecondsToTime(dispatchSec)}`;
+                    timeLabel = `وصول: ${formatSecondsToTime(arrSec)} | اعزام: ${formatSecondsToTime(dispatchSec)}`;
                 } else if (station.tMode === "MAIN_ARRIVE") {
-                    timeLabel = `ورود: ${formatSecondsToTime(arrSec)} | اعزام به خط اصلی از غدیر: ${formatSecondsToTime(dispatchSec)}`;
+                    timeLabel = `ورود: ${formatSecondsToTime(arrSec)} | اعزام اصلی: ${formatSecondsToTime(dispatchSec)}`;
                 } else {
                     timeLabel = isTerminal ? formatSecondsToTime(dispatchSec) : `${formatSecondsToTime(arrSec)} - ${formatSecondsToTime(dispatchSec)}`;
                 }
@@ -706,7 +721,8 @@
                     name.classList.add('active-text');
                     let remainingSeconds = dispSec - checkTime;
                     if (remainingSeconds >= 0) {
-                        countBox.innerText = `حرکت تا ${remainingSeconds} ثانیه`;
+                        // ⚡ تغییر نمایش ثانیه‌شمار معکوس به فرمت دیجیتال و ملموس MM:SS
+                        countBox.innerText = `حرکت تا ${formatDigitalCounter(remainingSeconds)}`;
                         countBox.style.display = "block";
                     }
                     pointer.style.left = posX + "px";
