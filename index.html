@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>گرافیک خطی سیر راهبران - نسخه 1.19.2</title>
+    <title>گرافیک خطی سیر راهبران - نسخه 1.19.3</title>
     <style>
         :root {
             --bg: #0c0d14;
@@ -154,7 +154,7 @@
 <body>
 
     <div id="homePage" class="page active">
-        <h2>📋 سیستم تنظیم هوشمند شیفت راهبران - نسخه 1.19.2</h2>
+        <h2>📋 سیستم تنظیم هوشمند شیفت راهبران - نسخه 1.19.3</h2>
         
         <div class="section-box">
             <h3>⚠️ ورود دستی برنامه (مواقع اضطراری)</h3>
@@ -280,7 +280,7 @@
             }
         }
 
-        // ⚡ اورهال و احیای قطعی تابع ورود دستی نسخه 1.19.2
+        // ⚡ احیا و اصلاح قطعی ثبت دستی نسخه 1.19.3
         function addManualTrip() {
             let type = document.getElementById('manualOrigin').value;
             let platformTime = document.getElementById('manualPlatform').value;
@@ -293,8 +293,6 @@
 
             let platformSec = getSecondsOfDay(platformTime);
             let dispatchSec = getSecondsOfDay(dispatchTime);
-            
-            // تخصیص مبدا زمانی دقیق حضور بر اساس ساعت اعزام
             let workSec = (type === "E") ? (dispatchSec - (20 * 60)) : (dispatchSec - (30 * 60));
 
             let label = type === "S" ? "غدیر" : (type === "E" ? "وکیل‌آباد" : "لوپ فرودگاه");
@@ -303,7 +301,7 @@
             let item = {
                 type: type, platformTime: platformTime, dispatchTime: dispatchTime,
                 raw: raw, workSec: workSec, platformSec: platformSec, dispatchSec: dispatchSec,
-                isAirportChain: (type === "F"), isTerminalEntry: false, isToParking: false // اضافه شدن تگ‌های الزامی پردازشگر لایو
+                isAirportChain: (type === "F"), isTerminalEntry: false, isToParking: false
             };
 
             if(type === "F") {
@@ -317,7 +315,6 @@
             parsedTrips.push(item);
             parsedTrips.sort((a, b) => a.dispatchSec - b.dispatchSec);
             
-            // ریست کادرهای فرم برای ثبت بعدی
             document.getElementById('manualPlatform').value = "";
             document.getElementById('manualDispatch').value = "";
             
@@ -615,7 +612,9 @@
                     {"name": "وکیل‌آباد (مقصد نهایی)", "sec": 2000, "isMainLine": true, "offset": 2535}
                 ];
             } else {
-                route = (trip.type === "S") ? ghadirToVakil : vakilToGhadir;
+                // ⚡ رفع باگ نهایی نسخه 1.19.3: شبیه‌سازی ساختار آرایه‌ها به صورت Deep Copy با حفظ تمام مقادیر استاتیک و تگ‌های isOrigin برای مسیرهای رفت و برگشت دستی
+                let baseRoute = (trip.type === "S") ? ghadirToVakil : vakilToGhadir;
+                route = JSON.parse(JSON.stringify(baseRoute));
             }
 
             let totalVirtualSec = isAirportMode ? (2000 + 2535) : route[route.length - 1].sec;
@@ -645,7 +644,7 @@
                     dispatchSec = getSecondsOfDay(trip.dispatchTime, station.sec);
                 }
 
-                // قانون اعمال ۳۰ ثانیه زمان مرده
+                // اعمال ۳۰ ثانیه زمان مرده برای ایستگاه‌های غیر مبدأ
                 if (!station.isOrigin && station.tMode !== "SHUNT" && station.tMode !== "MAIN_ARRIVE") {
                     dispatchSec += 30;
                 }
