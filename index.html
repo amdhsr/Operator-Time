@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>گرافیک خطی سیر راهبران - نسخه 1.19.3</title>
+    
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <title>گرافیک خطی سیر راهبران - نسخه 1.19.4</title>
     <style>
         :root {
             --bg: #0c0d14;
@@ -154,7 +159,7 @@
 <body>
 
     <div id="homePage" class="page active">
-        <h2>📋 سیستم تنظیم هوشمند شیفت راهبران - نسخه 1.19.3</h2>
+        <h2>📋 سیستم تنظیم هوشمند شیفت راهبران - نسخه 1.19.4</h2>
         
         <div class="section-box">
             <h3>⚠️ ورود دستی برنامه (مواقع اضطراری)</h3>
@@ -208,6 +213,9 @@
     </div>
 
     <script>
+        // ⚡ مانیتور نسخه کدهای کش‌شده دامینامیک
+        const CURRENT_VERSION = "1.19.4";
+
         const ghadirToVakil = [
             {"name": "غدیر", "sec": 0, "isOrigin": true}, {"name": "پروین اعتصامی", "sec": 152}, {"name": "۱۷ شهریور", "sec": 238},
             {"name": "بسیج", "sec": 350}, {"name": "امام خمینی", "sec": 457}, {"name": "شریعتی", "sec": 614},
@@ -268,19 +276,6 @@
             return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
         }
 
-        function clearAllData() {
-            if (confirm("آیا از حذف کل لیست اعزام‌ها و خالی کردن کادرهای پیامک اطمینان دارید؟")) {
-                document.getElementById('mainSmsInput').value = "";
-                document.getElementById('airportSmsInput').value = "";
-                document.getElementById('tomorrowBtn').style.display = "none";
-                parsedTrips = [];
-                isTomorrowShift = false;
-                if(homePageInterval) clearInterval(homePageInterval);
-                document.getElementById('tripsList').innerHTML = "";
-            }
-        }
-
-        // ⚡ احیا و اصلاح قطعی ثبت دستی نسخه 1.19.3
         function addManualTrip() {
             let type = document.getElementById('manualOrigin').value;
             let platformTime = document.getElementById('manualPlatform').value;
@@ -501,7 +496,7 @@
                     }
                     else if (trip.isAirportChain) {
                         let goDispatchSec = getSecondsOfDay(trip.airportGoDispatchStr);
-                        let backPlatformSec = getSecondsOfDay(trip.airportBackPlatformStr);
+                        let backPlatformSec = getSecondsOfDay(trip.airportBackPlatformSec);
                         let backDispatchSec = getSecondsOfDay(trip.airportBackDispatchStr);
 
                         if (checkTime >= goDispatchSec && checkTime < goDispatchSec + 540) {
@@ -612,7 +607,6 @@
                     {"name": "وکیل‌آباد (مقصد نهایی)", "sec": 2000, "isMainLine": true, "offset": 2535}
                 ];
             } else {
-                // ⚡ رفع باگ نهایی نسخه 1.19.3: شبیه‌سازی ساختار آرایه‌ها به صورت Deep Copy با حفظ تمام مقادیر استاتیک و تگ‌های isOrigin برای مسیرهای رفت و برگشت دستی
                 let baseRoute = (trip.type === "S") ? ghadirToVakil : vakilToGhadir;
                 route = JSON.parse(JSON.stringify(baseRoute));
             }
@@ -644,7 +638,6 @@
                     dispatchSec = getSecondsOfDay(trip.dispatchTime, station.sec);
                 }
 
-                // اعمال ۳۰ ثانیه زمان مرده برای ایستگاه‌های غیر مبدأ
                 if (!station.isOrigin && station.tMode !== "SHUNT" && station.tMode !== "MAIN_ARRIVE") {
                     dispatchSec += 30;
                 }
@@ -780,6 +773,17 @@
             renderTripsListLive();
             homePageInterval = setInterval(renderTripsListLive, 1000);
         }
+
+        // ⚡ مانیتور نهایی کش مرورگر موبایل: رفرش خودکار در صورت تداخل لود
+        window.onload = function() {
+            let loadedVersion = localStorage.getItem("app_version");
+            if (loadedVersion !== CURRENT_VERSION) {
+                localStorage.setItem("app_version", CURRENT_VERSION);
+                location.reload(true); 
+            } else {
+                showHome();
+            }
+        };
     </script>
 </body>
 </html>
